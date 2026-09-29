@@ -512,15 +512,7 @@
       font-weight: 700;
       color: #3b5f5d;
       margin-bottom: 0.85rem;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
       line-height: 1.35;
-    }
-
-    .modal-download-heading svg {
-      color: var(--primary-teal);
-      flex-shrink: 0;
     }
 
     .modal-download-actions {
@@ -545,32 +537,19 @@
       cursor: pointer;
     }
 
-    .btn-download--zip {
-      width: 100%;
-      background: var(--primary-teal);
-      color: #ffffff;
-      box-shadow: 0 4px 14px rgba(42, 157, 143, 0.28);
-      margin-bottom: 0.65rem;
-      font-size: 0.92rem;
-      padding: 0.8rem 1rem;
-    }
-
-    .btn-download--zip:hover {
-      background: #238579;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(42, 157, 143, 0.38);
-    }
-
     .btn-download--vue {
-      background: #42b883;
-      color: #ffffff;
-      box-shadow: 0 4px 14px rgba(66, 184, 131, 0.28);
+      background: #20232a;
+      color: #42b883;
+      border: 1px solid rgba(66, 184, 131, 0.35);
+      box-shadow: 0 4px 14px rgba(32, 35, 42, 0.22);
     }
 
     .btn-download--vue:hover {
-      background: #33a06f;
+      background: #282c34;
+      color: #42b883;
+      border-color: rgba(66, 184, 131, 0.65);
       transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(66, 184, 131, 0.38);
+      box-shadow: 0 6px 18px rgba(32, 35, 42, 0.32);
     }
 
     .btn-download--react {
@@ -582,9 +561,30 @@
 
     .btn-download--react:hover {
       background: #282c34;
-      color: #ffffff;
+      color: #61dafb;
+      border-color: rgba(97, 218, 251, 0.65);
       transform: translateY(-2px);
       box-shadow: 0 6px 18px rgba(32, 35, 42, 0.32);
+    }
+
+    .btn-download--zip {
+      width: 100%;
+      background: transparent;
+      border: 1.5px solid var(--primary-teal);
+      color: var(--primary-teal);
+      margin-top: 0.75rem;
+      margin-bottom: 0;
+      font-size: 0.92rem;
+      padding: 0.8rem 1rem;
+      box-shadow: none;
+    }
+
+    .btn-download--zip:hover {
+      background: rgba(88, 130, 137, 0.08);
+      border-color: #43656b;
+      color: #43656b;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(88, 130, 137, 0.15);
     }
 
     .btn-framework-icon {
@@ -726,30 +726,15 @@
           <div class="modal-category-tag" id="modalCategoryTag">Featured Update</div>
           <h3 class="modal-title" id="modalTitle"></h3>
           <p class="modal-desc" id="modalDesc">
-            Explore this featured update on TapeKids.org. You can plug this click event into any Vue or React route, modal, or article viewer.
+            This interactive hero section is ready to be included into the TapeKids.org website if you find it suitable: just use one of the buttons below to grab the entire section with all its current assets, or only the interactive slider in versions ready for React or Vue.
           </p>
         </div>
 
         <!-- Download Component Box -->
         <div class="modal-download-box">
           <div class="modal-download-heading">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span>Download this section and all its components here</span>
+            Download this section and all its components here
           </div>
-
-          <!-- Primary Download Button (Complete Bundle) -->
-          <a href="tapekids-hero-component.zip" download="tapekids-hero-component.zip" class="btn-download btn-download--zip" id="downloadZipBtn" title="Download Complete Package (.zip)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span>Download Full Bundle (.zip)</span>
-          </a>
 
           <div class="modal-download-actions">
             <!-- Vue Download Button -->
@@ -774,6 +759,16 @@
               <span>Download React Version</span>
             </a>
           </div>
+
+          <!-- Secondary Outline Download Button (Complete Bundle) -->
+          <a href="tapekids-hero-component.zip" download="tapekids-hero-component.zip" class="btn-download btn-download--zip" id="downloadZipBtn" title="Download Complete Package (.zip)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download Full Bundle (.zip)</span>
+          </a>
         </div>
       </div>
     </div>
@@ -1249,7 +1244,7 @@
         modalBadge.style.display = item.category ? "inline-block" : "none";
         modalCategoryTag.textContent = item.category ? `${item.category} • Featured Update` : "Featured Update";
         modalTitle.textContent = item.title;
-        modalDesc.textContent = `Explore "${item.title}" on TapeKids.org. You can customize this card click to link to any article, lesson, or video.`;
+        modalDesc.textContent = "This interactive hero section is ready to be included into the TapeKids.org website if you find it suitable: just use one of the buttons below to grab the entire section with all its current assets, or only the interactive slider in versions ready for React or Vue.";
         cardModal.classList.add("is-open");
       } else {
         // Center the clicked card
