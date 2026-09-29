@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TapeKids.org - 3D Orbital Hero Slider</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;700&family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --primary-teal: #588289;
+      --light-teal: #90bbc2;
+      --sky-mist: #dae9eb;
+      --bg-ice: #e1edef;
+      --navy-text: #2c3e50;
+      --card-w: clamp(200px, 14vw, 240px);
+      --card-h: clamp(340px, 24vw, 410px);
+      /* Globe on larger screens: 72vw max */
+      --earth-size: clamp(520px, 72vw, 840px);
+      --earth-offset-y: 0px;
+    }
+
+    body {
+      font-family: 'Figtree', sans-serif;
+      background-color: var(--bg-ice);
+      color: var(--navy-text);
+      overflow: hidden;
+      min-height: 100svh;
+      height: 100svh;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Hero Section: minimum 100svh height */
+    .hero-orbit-section {
+      position: relative;
+      width: 100%;
+      height: 100svh;
+      min-height: 100svh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #78a3aa 0%, #9fc1c7 40%, #cee0e3 75%, #e1edef 100%);
+    }
+
+    /* Atmospheric subtle radiance */
+    .hero-atmosphere {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.38) 0%, transparent 68%);
+    }
+
+    /* Earth & Slides Container: max-width 90vw, centered in viewport */
+    .orbit-component-container {
+      position: relative;
+      width: 100%;
+      max-width: 90vw;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      z-index: 10;
+    }
+
+    /* 3D Orbit Viewport */
+    .orbit-viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: pan-y pinch-zoom;
+    }
+
+    .orbit-viewport.is-dragging {
+      cursor: grabbing;
+    }
+
+    /* Orbit Stage where Earth & Cards reside as direct siblings */
+    .orbit-stage {
+      position: absolute;
+      width: 0;
+      height: 0;
+      top: 50%;
+      left: 50%;
+      transform-style: preserve-3d;
+      pointer-events: none;
+    }
+
+    /* Subtle decorative orbit ring guide behind/around earth */
+    .orbit-ring-guide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(255, 255, 255, 0.42);
+      pointer-events: none;
+      z-index: 5;
+      transform-style: preserve-3d;
+      opacity: 0.75;
+      box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Earth Container */
+    .earth-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--earth-size);
+      height: var(--earth-size);
+      margin-top: calc(-1 * var(--earth-size) / 2 + var(--earth-offset-y));
+      margin-left: calc(-1 * var(--earth-size) / 2);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: margin-top 0.3s ease;
+    }
+
+    .earth-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      border-radius: 50%;
+      background: transparent;
+    }
+
+    .earth-atmosphere-glow {
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, transparent 60%, rgba(255, 255, 255, 0.45) 86%, rgba(144, 187, 194, 0.82) 100%);
+      mix-blend-mode: screen;
+      z-index: 2;
+    }
+
+    /* 3D Orbit Cards */
+    .orbit-card {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--card-w);
+      height: var(--card-h);
+      margin-left: calc(-1 * var(--card-w) / 2);
+      margin-top: calc(-1 * var(--card-h) / 2);
+      transform-origin: center center;
+      cursor: pointer;
+      pointer-events: auto;
+      will-change: transform, filter;
+      opacity: 1 !important;
+      transition: box-shadow 0.25s ease;
+    }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #1c3e46;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow:
+        0 14px 34px rgba(28, 62, 70, 0.28),
+        0 4px 12px rgba(0, 0, 0, 0.12);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .orbit-card:hover .card-inner {
+      border-color: rgba(255, 255, 255, 0.85);
+      box-shadow:
+        0 20px 44px rgba(28, 62, 70, 0.38),
+        0 6px 16px rgba(0, 0, 0, 0.18);
+    }
+
+    .card-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      background-color: #244b54;
+      pointer-events: none;
+    }
+
+    .card-scrim {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(15, 36, 41, 0.05) 0%,
+        rgba(15, 36, 41, 0.15) 45%,
+        rgba(15, 36, 41, 0.72) 75%,
+        rgba(15, 36, 41, 0.94) 100%
+      );
+      pointer-events: none;
+    }
+
+    .card-badge {
+      position: absolute;
+      top: 0.9rem;
+      left: 0.9rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(28, 62, 70, 0.65);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      z-index: 2;
+    }
+
+    .card-title {
+      position: relative;
+      z-index: 2;
+      color: #ffffff;
+      font-family: 'Figtree', sans-serif;
+      font-size: 1.12rem;
+      font-weight: 800;
+      line-height: 1.25;
+      padding: 1.1rem 1rem 1.15rem;
+      text-wrap: balance;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+    }
+
+    /* Left & Right Chevrons */
+    .nav-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(88, 130, 137, 0.25);
+      color: var(--primary-teal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 250;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .nav-arrow:hover {
+      background: #ffffff;
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+    }
+
+    .nav-arrow:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    .nav-arrow.prev { left: 0.5rem; }
+    .nav-arrow.next { right: 0.5rem; }
+
+    /* Bottom Contrasting Half-Circle Pedestal (comes up 4-6rem from bottom edge) */
+    .bottom-half-circle-pedestal {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: clamp(340px, 40vw, 560px);
+      height: 5.2rem;
+      background: #ffffff;
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      box-shadow:
+        0 -10px 35px rgba(28, 62, 70, 0.16),
+        0 -2px 10px rgba(88, 130, 137, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      z-index: 150;
+      padding-top: 0.6rem;
+      padding-bottom: 0.2rem;
+    }
+
+    /* Slider Bullets / Dots */
+    .orbit-dots {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .orbit-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: rgba(88, 130, 137, 0.35);
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .orbit-dot:hover {
+      background: rgba(88, 130, 137, 0.6);
+    }
+
+    .orbit-dot.is-active {
+      width: 24px;
+      border-radius: 999px;
+      background: var(--primary-teal);
+      box-shadow: 0 2px 8px rgba(88, 130, 137, 0.45);
+    }
+
+    /* All Updates Button in contrasting half-circle */
+    .all-updates-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--primary-teal);
+      text-decoration: none;
+      padding: 0.3rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(88, 130, 137, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .all-updates-btn:hover {
+      background: var(--primary-teal);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(88, 130, 137, 0.25);
+    }
+
+    /* =========================================================
+       REDESIGNED HORIZONTAL CARD & DOWNLOAD MODAL
+       ========================================================= */
+    .card-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(14, 30, 34, 0.68);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .card-modal-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .card-modal {
+      background: #ffffff;
+      border-radius: 24px;
+      max-width: 860px;
+      width: 100%;
+      overflow: hidden;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.38);
+      transform: scale(0.94);
+      transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+
+    .card-modal-backdrop.is-open .card-modal {
+      transform: scale(1);
+    }
+
+    .modal-x-close {
+      position: absolute;
+      top: 1rem;
+      right: 1.1rem;
+      width: 36px;
+      height: 36px;
+      background: rgba(44, 62, 80, 0.08);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      line-height: 1;
+      color: #2c3e50;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .modal-x-close:hover {
+      background: rgba(44, 62, 80, 0.16);
+      transform: scale(1.08);
+    }
+
+    /* Left pane: full portrait image without bad cropping */
+    .modal-left-image-pane {
+      flex: 0 0 320px;
+      width: 320px;
+      background: #1c3e46;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-cover {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+
+    .modal-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      padding: 0.32rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(28, 62, 70, 0.75);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    /* Right pane: white content box */
+    .modal-right-content-pane {
+      flex: 1;
+      padding: 2.25rem 2.25rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .modal-content-header {
+      margin-bottom: 1.25rem;
+      padding-right: 1.5rem;
+    }
+
+    .modal-category-tag {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--primary-teal);
+      margin-bottom: 0.35rem;
+    }
+
+    .modal-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy-text);
+      line-height: 1.25;
+      margin-bottom: 0.75rem;
+      text-wrap: balance;
+    }
+
+    .modal-desc {
+      color: #5a7378;
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    /* Download Box */
+    .modal-download-box {
+      background: #f4f8f8;
+      border: 1px solid #d9e7e8;
+      border-radius: 16px;
+      padding: 1.25rem;
+    }
+
+    .modal-download-heading {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #3b5f5d;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      line-height: 1.35;
+    }
+
+    .modal-download-heading svg {
+      color: var(--primary-teal);
+      flex-shrink: 0;
+    }
+
+    .modal-download-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .btn-download {
+      padding: 0.75rem 0.9rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .btn-download--zip {
+      width: 100%;
+      background: var(--primary-teal);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(42, 157, 143, 0.28);
+      margin-bottom: 0.65rem;
+      font-size: 0.92rem;
+      padding: 0.8rem 1rem;
+    }
+
+    .btn-download--zip:hover {
+      background: #238579;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(42, 157, 143, 0.38);
+    }
+
+    .btn-download--vue {
+      background: #42b883;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(66, 184, 131, 0.28);
+    }
+
+    .btn-download--vue:hover {
+      background: #33a06f;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(66, 184, 131, 0.38);
+    }
+
+    .btn-download--react {
+      background: #20232a;
+      color: #61dafb;
+      border: 1px solid rgba(97, 218, 251, 0.35);
+      box-shadow: 0 4px 14px rgba(32, 35, 42, 0.22);
+    }
+
+    .btn-download--react:hover {
+      background: #282c34;
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(32, 35, 42, 0.32);
+    }
+
+    .btn-framework-icon {
+      flex-shrink: 0;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 1024px) {
+      :root {
+        --card-w: clamp(185px, 22vw, 220px);
+        --card-h: clamp(320px, 38vh, 380px);
+        --earth-size: clamp(380px, 66vw, 530px);
+        /* Move globe up on tablet so top 3rd peeks up over the cards */
+        --earth-offset-y: -75px;
+      }
+
+      .orbit-component-container {
+        max-width: 95vw;
+      }
+      .bottom-half-circle-pedestal {
+        width: clamp(320px, 58vw, 440px);
+        height: 4.8rem;
+      }
+      .orbit-stage {
+        transform: translateY(0.5rem);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .card-modal {
+        flex-direction: column;
+        max-height: 88vh;
+        overflow-y: auto;
+      }
+      .modal-left-image-pane {
+        width: 100%;
+        flex: 0 0 220px;
+        height: 220px;
+      }
+      .modal-right-content-pane {
+        padding: 1.35rem 1.25rem 1.5rem;
+      }
+      .modal-title {
+        font-size: 1.35rem;
+      }
+      .btn-download {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      :root {
+        --card-w: clamp(165px, 46vw, 205px);
+        --card-h: clamp(285px, 42vh, 345px);
+        --earth-size: clamp(310px, 80vw, 390px);
+        /* Move globe up on mobile so top 3rd clearly peeks over the cards */
+        --earth-offset-y: -90px;
+      }
+
+      .bottom-half-circle-pedestal {
+        width: 88vw;
+        height: 4.5rem;
+      }
+      .card-title {
+        font-size: 0.98rem;
+        padding: 0.8rem;
+      }
+      .orbit-stage {
+        transform: translateY(1.2rem);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero Section: Pure 3D Earth & Orbital Cards Component -->
+  <section class="hero-orbit-section" id="heroSection">
+    <div class="hero-atmosphere"></div>
+
+    <!-- Earth and Slides Component: max-width 90vw, centered in viewport -->
+    <div class="orbit-component-container">
+      <div class="orbit-viewport" id="orbitViewport">
+        <!-- 3D Orbit Stage where Earth & Cards reside together -->
+        <div class="orbit-stage" id="orbitStage">
+          <!-- Guide ring -->
+          <div class="orbit-ring-guide" id="orbitRingGuide"></div>
+
+          <!-- Earth in the Middle -->
+          <div class="earth-container" id="earthContainer">
+            <canvas id="earthCanvas" class="earth-canvas"></canvas>
+            <div class="earth-atmosphere-glow"></div>
+          </div>
+
+          <!-- Cards will be injected here as siblings of the earth -->
+        </div>
+      </div>
+
+      <!-- Left & Right Arrow Buttons -->
+      <button class="nav-arrow prev" id="prevBtn" aria-label="Previous card">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <button class="nav-arrow next" id="nextBtn" aria-label="Next card">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Bottom Contrasting Half-Circle Pedestal (comes up 4-6rem from bottom edge) -->
+    <div class="bottom-half-circle-pedestal">
+      <!-- Bullets / Dots -->
+      <div class="orbit-dots" id="orbitDots"></div>
+      <!-- All Updates link -->
+      <a href="https://tapekids.org/en/updates" class="all-updates-btn" target="_blank" rel="noopener noreferrer">
+        All Updates
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </a>
+    </div>
+  </section>
+
+  <!-- Redesigned Horizontal Card & Component Download Modal -->
+  <div class="card-modal-backdrop" id="cardModal">
+    <div class="card-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-x-close" id="modalClose" aria-label="Close modal">&times;</button>
+      
+      <!-- Left side: Full portrait-oriented image without bad cropping -->
+      <div class="modal-left-image-pane">
+        <img src="" alt="" class="modal-cover" id="modalCover" />
+        <span class="modal-badge" id="modalBadge"></span>
+      </div>
+
+      <!-- Right side: White content box with info & download buttons -->
+      <div class="modal-right-content-pane">
+        <div class="modal-content-header">
+          <div class="modal-category-tag" id="modalCategoryTag">Featured Update</div>
+          <h3 class="modal-title" id="modalTitle"></h3>
+          <p class="modal-desc" id="modalDesc">
+            Explore this featured update on TapeKids.org. You can plug this click event into any Vue or React route, modal, or article viewer.
+          </p>
+        </div>
+
+        <!-- Download Component Box -->
+        <div class="modal-download-box">
+          <div class="modal-download-heading">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download this section and all its components here</span>
+          </div>
+
+          <!-- Primary Download Button (Complete Bundle) -->
+          <a href="tapekids-hero-component.zip" download="tapekids-hero-component.zip" class="btn-download btn-download--zip" id="downloadZipBtn" title="Download Complete Package (.zip)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download Full Bundle (.zip)</span>
+          </a>
+
+          <div class="modal-download-actions">
+            <!-- Vue Download Button -->
+            <a href="TapeKidsOrbitSlider.vue" download="TapeKidsOrbitSlider.vue" class="btn-download btn-download--vue" id="downloadVueBtn" title="Download TapeKidsOrbitSlider.vue">
+              <svg class="btn-framework-icon" viewBox="0 0 261.76 226.69" width="18" height="18">
+                <path d="M161.096.001l-30.225 52.351L100.647.001H-.005l130.877 226.688L261.749.001z" fill="#41b883"/>
+                <path d="M161.096.001l-30.225 52.351L100.647.001H52.846l78.026 135.145L208.897.001z" fill="#34495e"/>
+              </svg>
+              <span>Download Vue Version</span>
+            </a>
+
+            <!-- React Download Button -->
+            <a href="TapeKidsOrbitSlider.tsx" download="TapeKidsOrbitSlider.tsx" class="btn-download btn-download--react" id="downloadReactBtn" title="Download TapeKidsOrbitSlider.tsx">
+              <svg class="btn-framework-icon" viewBox="-11.5 -10.23174 23 20.46348" width="18" height="18">
+                <circle cx="0" cy="0" r="2.05" fill="#61dafb"/>
+                <g stroke="#61dafb" stroke-width="1" fill="none">
+                  <ellipse rx="11" ry="4.2"/>
+                  <ellipse rx="11" ry="4.2" transform="rotate(60)"/>
+                  <ellipse rx="11" ry="4.2" transform="rotate(120)"/>
+                </g>
+              </svg>
+              <span>Download React Version</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Live items from TapeKids.org (cached locally for instant 100% offline & GitHub Pages reliability)
+    const CARDS_DATA = [
+      {
+        id: "its-in-you",
+        title: "It's In You",
+        category: "Creations",
+        image: "cards/its-in-you.jpg"
+      },
+      {
+        id: "god-rich-mercy",
+        title: "The God Who Is Rich In Mercy",
+        category: "Updates",
+        image: "cards/god-rich-mercy.jpg"
+      },
+      {
+        id: "coloring-book-stats",
+        title: "Coloring Book Stats",
+        category: "Creations",
+        image: "cards/coloring-book-stats.jpg"
+      },
+      {
+        id: "wesley-birthplace",
+        title: "John Wesley's Birthplace",
+        category: "History",
+        image: "cards/wesley-birthplace.jpg"
+      },
+      {
+        id: "save-tapekids-app",
+        title: "Save TapeKids.org to your smartphone home screen",
+        category: "Tips",
+        image: "cards/save-tapekids-app.jpg"
+      },
+      {
+        id: "laodicean-age",
+        title: "The Laodicean Church Age",
+        category: "Church Ages",
+        image: "cards/laodicean-age.jpg"
+      }
+    ];
+
+    const N = CARDS_DATA.length;
+    const stepAngle = (2 * Math.PI) / N;
+
+    // State
+    let currentAngle = 0;
+    let targetAngle = 0;
+    let lastAngle = 0;
+    let velocity = 0;
+    let isDragging = false;
+    let activeIndex = 0;
+
+    // Subtle Mouseover Parallax State
+    let targetMouseX = 0;
+    let targetMouseY = 0;
+    let smoothMouseX = 0;
+    let smoothMouseY = 0;
+
+    // Drag interaction tracking
+    let startX = 0;
+    let lastX = 0;
+    let lastTime = 0;
+    let hasMoved = false;
+
+    // Three.js instances
+    let threeScene, threeCamera, threeRenderer, threeGlobe;
+
+    // DOM Elements
+    const stage = document.getElementById("orbitStage");
+    const viewport = document.getElementById("orbitViewport");
+    const ringGuide = document.getElementById("orbitRingGuide");
+    const dotsContainer = document.getElementById("orbitDots");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const earthCanvas = document.getElementById("earthCanvas");
+
+    // Modal elements
+    const cardModal = document.getElementById("cardModal");
+    const modalCover = document.getElementById("modalCover");
+    const modalBadge = document.getElementById("modalBadge");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalCategoryTag = document.getElementById("modalCategoryTag");
+    const modalDesc = document.getElementById("modalDesc");
+    const modalClose = document.getElementById("modalClose");
+
+    // Build DOM Cards & Bullets
+    const cardElements = [];
+    const dotElements = [];
+
+    CARDS_DATA.forEach((item, index) => {
+      // 1. Create Card
+      const card = document.createElement("div");
+      card.className = "orbit-card";
+      card.setAttribute("data-index", index);
+      card.innerHTML = `
+        <div class="card-inner">
+          <img class="card-image" src="${item.image}" alt="${item.title}" loading="lazy" />
+          <div class="card-scrim"></div>
+          ${item.category ? `<div class="card-badge">${item.category}</div>` : ""}
+          <h3 class="card-title">${item.title}</h3>
+        </div>
+      `;
+      card.addEventListener("click", () => {
+        if (!hasMoved) onCardClick(index);
+      });
+      stage.appendChild(card);
+      cardElements.push(card);
+
+      // 2. Create Dot Bullet
+      const dot = document.createElement("button");
+      dot.className = "orbit-dot";
+      dot.setAttribute("aria-label", `Go to ${item.title}`);
+      dot.addEventListener("click", () => rotateToIndex(index));
+      dotsContainer.appendChild(dot);
+      dotElements.push(dot);
+    });
+
+    // Three.js Hardware WebGL Globe with Transparent Oceans
+    function initThreeGlobe() {
+      const container = earthCanvas.parentElement;
+      const size = Math.max(300, container.clientWidth || 720);
+
+      threeScene = new THREE.Scene();
+      threeCamera = new THREE.PerspectiveCamera(39.5, 1, 0.1, 100);
+      threeCamera.position.z = 2.85;
+
+      threeRenderer = new THREE.WebGLRenderer({
+        canvas: earthCanvas,
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance"
+      });
+      threeRenderer.setSize(size, size);
+      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.12);
+      threeScene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.42);
+      dirLight.position.set(-2.5, 3.2, 4);
+      threeScene.add(dirLight);
+
+      threeGlobe = new THREE.Group();
+      threeScene.add(threeGlobe);
+
+      // High-res map texture with transparent water
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load("earth-texture.png", (tex) => {
+        tex.generateMipmaps = true;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        if (threeRenderer) {
+          tex.anisotropy = Math.min(16, threeRenderer.capabilities.getMaxAnisotropy());
+        }
+
+        const geometry = new THREE.SphereGeometry(1, 96, 96);
+
+        // 1. Far side continents (faintly visible through transparent front ocean)
+        const backMaterial = new THREE.MeshStandardMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.35,
+          side: THREE.BackSide,
+          depthWrite: false,
+          roughness: 0.8,
+          metalness: 0.02
+        });
+        const backMesh = new THREE.Mesh(geometry, backMaterial);
+        backMesh.renderOrder = 1;
+        threeGlobe.add(backMesh);
+
+        // 2. Near side continents (crisp white with 100% transparent water)
+        const frontMaterial = new THREE.MeshStandardMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.98,
+          side: THREE.FrontSide,
+          depthWrite: true,
+          roughness: 0.65,
+          metalness: 0.02
+        });
+        const frontMesh = new THREE.Mesh(geometry, frontMaterial);
+        frontMesh.renderOrder = 2;
+        threeGlobe.add(frontMesh);
+
+        threeGlobe.rotation.y = 1.8;
+        threeRenderer.render(threeScene, threeCamera);
+      });
+    }
+
+    function resizeThreeGlobe() {
+      if (!threeRenderer || !threeCamera) return;
+      const container = earthCanvas.parentElement;
+      if (!container) return;
+      const size = Math.max(300, container.clientWidth);
+      threeRenderer.setSize(size, size);
+      threeCamera.aspect = 1;
+      threeCamera.updateProjectionMatrix();
+      if (threeScene && threeGlobe) {
+        threeRenderer.render(threeScene, threeCamera);
+      }
+    }
+
+    // Dynamic Orbital Radius Calculation
+    function getOrbitParams() {
+      const w = window.innerWidth;
+      let earthSize, cardW, tiltDeg, cardScaleMin;
+
+      if (w <= 640) {
+        earthSize = Math.min(w * 0.80, 390);
+        cardW = Math.min(w * 0.46, 205);
+        tiltDeg = 7;
+        cardScaleMin = 0.62;
+      } else if (w <= 1024) {
+        earthSize = Math.min(w * 0.66, 530);
+        cardW = Math.min(w * 0.22, 220);
+        tiltDeg = 8;
+        cardScaleMin = 0.68;
+      } else {
+        // 72vw max on large screens
+        earthSize = Math.min(w * 0.72, 840);
+        cardW = Math.min(w * 0.14, 240);
+        tiltDeg = 9;
+        cardScaleMin = 0.70;
+      }
+
+      const rGlobe = earthSize / 2;
+      const minClearanceRx = rGlobe + (cardW / 2) + 18;
+      const rx = Math.max(minClearanceRx, w * 0.38);
+      const rz = Math.round(rx * 0.56);
+
+      return { rx, rz, tiltDeg, cardScaleMin, earthSize };
+    }
+
+    // Update 3D card layout and states
+    function updateCards() {
+      const { rx, rz, tiltDeg, cardScaleMin } = getOrbitParams();
+      const tiltRad = (tiltDeg * Math.PI) / 180;
+
+      ringGuide.style.width = `${rx * 2 + 80}px`;
+      ringGuide.style.height = `${rz * 2 + 50}px`;
+      ringGuide.style.marginLeft = `-${rx + 40}px`;
+      ringGuide.style.marginTop = `-${rz + 25}px`;
+      ringGuide.style.transform = `rotateX(74deg)`;
+
+      let closestDist = Infinity;
+      let newActive = 0;
+
+      for (let i = 0; i < N; i++) {
+        const theta = currentAngle + i * stepAngle;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+
+        const x = sinT * rx;
+        const z = cosT * rz;
+        const y = -cosT * Math.sin(tiltRad) * 65;
+
+        const normZ = (z + rz) / (2 * rz); // 0 (back) to 1 (front)
+
+        // Active Card ~1.3x Larger Hero Scaling
+        const baseScale = cardScaleMin + normZ * (1.0 - cardScaleMin);
+        const focalBoost = Math.pow(normZ, 2.8) * 0.36;
+        const scale = baseScale + focalBoost;
+
+        const rotateY = -sinT * 25;
+        const rotateZ = -sinT * 3;
+
+        // Subtle mouseover animation pull:
+        const pullFactor = 0.35 + 0.65 * Math.pow(normZ, 2.0);
+        const pullX = smoothMouseX * 18 * pullFactor;
+        const pullY = smoothMouseY * 6 * pullFactor;
+        const pullRotY = smoothMouseX * 3.5 * pullFactor;
+        const pullRotX = -smoothMouseY * 2.0 * pullFactor;
+
+        // All inactive cards are FULLY OPAQUE - zero transparency at any point!
+        const contrast = 0.65 + normZ * 0.35;
+        const brightness = 0.85 + normZ * 0.15;
+        const blurPx = Math.max(0, (0.45 - normZ) * 2.2);
+
+        let zIndex;
+        let filter = "none";
+
+        if (z >= 0) {
+          zIndex = 60 + Math.round(normZ * 35);
+          if (normZ <= 0.88) {
+            filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+          }
+        } else {
+          zIndex = 10 + Math.round(normZ * 35);
+          filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)}) blur(${blurPx.toFixed(1)}px)`;
+        }
+
+        const card = cardElements[i];
+        card.style.transform = `perspective(1200px) translate3d(${(x + pullX).toFixed(1)}px, ${(y + pullY).toFixed(1)}px, 0) rotateX(${pullRotX.toFixed(1)}deg) rotateY(${(rotateY + pullRotY).toFixed(1)}deg) rotateZ(${rotateZ.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
+        card.style.zIndex = zIndex;
+        card.style.opacity = "1";
+        card.style.filter = filter;
+
+        const normAngle = ((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const distToCenter = Math.min(normAngle, 2 * Math.PI - normAngle);
+        if (distToCenter < closestDist) {
+          closestDist = distToCenter;
+          newActive = i;
+        }
+      }
+
+      activeIndex = newActive;
+      dotElements.forEach((dot, idx) => {
+        dot.classList.toggle("is-active", idx === activeIndex);
+      });
+      cardElements.forEach((c, idx) => {
+        c.classList.toggle("is-active", idx === activeIndex);
+      });
+    }
+
+    // Render loop
+    let lastTickTime = performance.now();
+
+    function tick() {
+      const now = performance.now();
+      const dtMs = Math.min(32, Math.max(1, now - lastTickTime));
+      lastTickTime = now;
+
+      // Smooth mouse coordinates for parallax
+      smoothMouseX += (targetMouseX - smoothMouseX) * 0.08;
+      smoothMouseY += (targetMouseY - smoothMouseY) * 0.08;
+
+      if (!isDragging) {
+        // Natural ease-out snap interpolation
+        const diff = targetAngle - currentAngle;
+        if (Math.abs(diff) > 0.0001) {
+          currentAngle += diff * 0.085;
+        } else {
+          currentAngle = targetAngle;
+        }
+      }
+
+      // Track slider movement delta
+      const sliderDelta = currentAngle - lastAngle;
+      lastAngle = currentAngle;
+
+      // Spin globe smoothly: spins with slider when moved, or default relaxed speed
+      if (threeGlobe && threeRenderer && threeScene && threeCamera) {
+        threeGlobe.rotation.y += 0.0028 + sliderDelta * 0.85;
+        threeRenderer.render(threeScene, threeCamera);
+      }
+
+      updateCards();
+      requestAnimationFrame(tick);
+    }
+
+    // Pointer Events for Dragging
+    function onPointerDown(e) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      isDragging = true;
+      hasMoved = false;
+      viewport.classList.add("is-dragging");
+
+      startX = e.clientX;
+      lastX = startX;
+      lastTime = performance.now();
+      velocity = 0;
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerUp);
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging) return;
+      const clientX = e.clientX;
+      const deltaX = clientX - lastX;
+      if (Math.abs(clientX - startX) > 6) {
+        hasMoved = true;
+      }
+
+      const now = performance.now();
+      const dt = Math.max(1, now - lastTime);
+      const angularDelta = deltaX * 0.0035;
+
+      currentAngle += angularDelta;
+      targetAngle = currentAngle;
+      velocity = (angularDelta / dt) * 16.6;
+
+      lastX = clientX;
+      lastTime = now;
+    }
+
+    function onPointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      viewport.classList.remove("is-dragging");
+
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+
+      // Snap cleanly to nearest card
+      if (Math.abs(velocity) > 0.005) {
+        snapToNearest(currentAngle + velocity * 15);
+      } else {
+        snapToNearest(currentAngle);
+      }
+    }
+
+    function snapToNearest(baseAngle) {
+      const snappedStep = Math.round(baseAngle / stepAngle);
+      targetAngle = snappedStep * stepAngle;
+    }
+
+    // Navigation Controls
+    function stepPrev() {
+      const currentStep = Math.round(targetAngle / stepAngle);
+      targetAngle = (currentStep + 1) * stepAngle;
+    }
+
+    function stepNext() {
+      const currentStep = Math.round(targetAngle / stepAngle);
+      targetAngle = (currentStep - 1) * stepAngle;
+    }
+
+    function rotateToIndex(targetIndex) {
+      const currentTargetStep = Math.round(targetAngle / stepAngle);
+      const currentNormalized = ((-currentTargetStep % N) + N) % N;
+
+      let diff = targetIndex - currentNormalized;
+      if (diff > N / 2) diff -= N;
+      if (diff < -N / 2) diff += N;
+
+      targetAngle = (currentTargetStep - diff) * stepAngle;
+    }
+
+    // Card Click & Modal Preview Handler
+    function onCardClick(index) {
+      if (index === activeIndex) {
+        // Open redesigned horizontal preview & download modal
+        const item = CARDS_DATA[index];
+        modalCover.src = item.image;
+        modalBadge.textContent = item.category || "Update";
+        modalBadge.style.display = item.category ? "inline-block" : "none";
+        modalCategoryTag.textContent = item.category ? `${item.category} • Featured Update` : "Featured Update";
+        modalTitle.textContent = item.title;
+        modalDesc.textContent = `Explore "${item.title}" on TapeKids.org. You can customize this card click to link to any article, lesson, or video.`;
+        cardModal.classList.add("is-open");
+      } else {
+        // Center the clicked card
+        rotateToIndex(index);
+      }
+    }
+
+    // Mouseover Parallax Listeners on Hero Section
+    const heroSection = document.getElementById("heroSection");
+    if (heroSection) {
+      heroSection.addEventListener("pointermove", (e) => {
+        const rect = heroSection.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        targetMouseX = Math.max(-1, Math.min(1, (e.clientX - centerX) / (rect.width / 2)));
+        targetMouseY = Math.max(-1, Math.min(1, (e.clientY - centerY) / (rect.height / 2)));
+      });
+
+      heroSection.addEventListener("pointerleave", () => {
+        targetMouseX = 0;
+        targetMouseY = 0;
+      });
+    }
+
+    // Pointer Drag Listeners
+    viewport.addEventListener("pointerdown", onPointerDown);
+
+    // Arrow Button Navigation
+    prevBtn.addEventListener("click", stepPrev);
+    nextBtn.addEventListener("click", stepNext);
+
+    // Keyboard navigation
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        stepPrev();
+      } else if (e.key === "ArrowRight") {
+        stepNext();
+      } else if (e.key === "Escape") {
+        cardModal.classList.remove("is-open");
+      }
+    });
+
+    // Modal close
+    modalClose.addEventListener("click", () => {
+      cardModal.classList.remove("is-open");
+    });
+    cardModal.addEventListener("click", (e) => {
+      if (e.target === cardModal) {
+        cardModal.classList.remove("is-open");
+      }
+    });
+
+    // Window resize
+    window.addEventListener("resize", () => {
+      updateCards();
+      resizeThreeGlobe();
+    });
+
+    // Initialize WebGL Globe & Cards
+    initThreeGlobe();
+    updateCards();
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
