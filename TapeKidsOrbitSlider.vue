@@ -210,20 +210,25 @@ function getOrbitParams() {
     cardW = Math.min(w * 0.22, 220);
     tiltDeg = 8;
     cardScaleMin = 0.68;
+    const rGlobe = earthSize / 2;
+    const minClearanceRx = (rGlobe + (cardW / 2) + 10) / 0.866;
+    const maxRx = (w / 2) - (cardW / 2) - 18;
+    const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+    const rz = Math.round(rx * 0.52);
+    return { rx, rz, tiltDeg, cardScaleMin, earthSize };
   } else {
     // 72vw max on large screens
     earthSize = Math.min(w * 0.72, 840);
-    cardW = Math.min(w * 0.14, 240);
+    cardW = Math.min(w * 0.14, 230);
     tiltDeg = 9;
     cardScaleMin = 0.70;
+    const rGlobe = earthSize / 2;
+    const minClearanceRx = (rGlobe + (cardW / 2) + 16) / 0.866;
+    const maxRx = (w / 2) - (cardW / 2) - 32;
+    const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+    const rz = Math.round(rx * 0.54);
+    return { rx, rz, tiltDeg, cardScaleMin, earthSize };
   }
-
-  const rGlobe = earthSize / 2;
-  const minClearanceRx = rGlobe + (cardW / 2) + 18;
-  const rx = Math.max(minClearanceRx, w * 0.38);
-  const rz = Math.round(rx * 0.56);
-
-  return { rx, rz, tiltDeg, cardScaleMin, earthSize };
 }
 
 function updatePositions() {
@@ -260,39 +265,57 @@ function updatePositions() {
     const focalBoost = Math.pow(normZ, 2.8) * 0.36;
     const scale = baseScale + focalBoost;
 
-    const rotateY = -sinT * 25;
-    const rotateZ = -sinT * 3;
+    const rotateY = -sinT * 22;
+    const rotateZ = -sinT * 2.5;
 
-    // Subtle mouseover animation pull:
+    // Subtle mouseover animation pull (active card pulls most noticeably, disabled during drag):
     const pullFactor = 0.35 + 0.65 * Math.pow(normZ, 2.0);
-    const pullX = smoothMouseX * 18 * pullFactor;
-    const pullY = smoothMouseY * 6 * pullFactor;
-    const pullRotY = smoothMouseX * 3.5 * pullFactor;
-    const pullRotX = -smoothMouseY * 2.0 * pullFactor;
+    const pullX = isDragging.value ? 0 : smoothMouseX * 16 * pullFactor;
+    const pullY = isDragging.value ? 0 : smoothMouseY * 5 * pullFactor;
+    const pullRotY = isDragging.value ? 0 : smoothMouseX * 2.5 * pullFactor;
+    const pullRotX = isDragging.value ? 0 : -smoothMouseY * 1.5 * pullFactor;
 
-    // All inactive cards are FULLY OPAQUE - zero transparency at any point!
-    // Lower contrast more and more the further away the cards are
-    const contrast = 0.65 + normZ * 0.35;
-    const brightness = 0.85 + normZ * 0.15;
-    const blurPx = Math.max(0, (0.45 - normZ) * 2.2);
+    // Inactive cards: fully opaque with realistic contrast & depth attenuation
+    const contrast = 0.72 + normZ * 0.28;
+    const brightness = 0.88 + normZ * 0.12;
 
     let zIndex: number;
+    let opacity: string;
+    let pointerEvents: string;
+    let visibility: string;
     let filter = 'none';
 
-    if (z >= 0) {
-      zIndex = 60 + Math.round(normZ * 35);
+    if (normZ >= 0.55) {
+      // Front hemisphere: 100% FULLY OPAQUE, crisp, interactive
+      zIndex = 70 + Math.round(normZ * 30);
+      opacity = '1';
+      pointerEvents = 'auto';
+      visibility = 'visible';
       if (normZ <= 0.88) {
         filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
       }
+    } else if (normZ >= 0.45) {
+      // Horizon edge transition: smoothly fades in/out as cards round behind the globe
+      const fade = (normZ - 0.45) / 0.1;
+      zIndex = 55 + Math.round(normZ * 10);
+      opacity = fade.toFixed(3);
+      pointerEvents = 'none';
+      visibility = 'visible';
+      filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
     } else {
-      zIndex = 10 + Math.round(normZ * 35);
-      filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)}) blur(${blurPx.toFixed(1)}px)`;
+      // Far side of the globe: strictly hidden to eliminate any overlapping or ghosting
+      zIndex = 1;
+      opacity = '0';
+      pointerEvents = 'none';
+      visibility = 'hidden';
     }
 
     newStyles.push({
       transform: `perspective(1200px) translate3d(${(x + pullX).toFixed(1)}px, ${(y + pullY).toFixed(1)}px, 0) rotateX(${pullRotX.toFixed(1)}deg) rotateY(${(rotateY + pullRotY).toFixed(1)}deg) rotateZ(${rotateZ.toFixed(1)}deg) scale(${scale.toFixed(3)})`,
       zIndex: String(zIndex),
-      opacity: '1',
+      opacity,
+      pointerEvents,
+      visibility,
       filter
     });
 

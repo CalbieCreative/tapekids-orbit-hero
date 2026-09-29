@@ -105,34 +105,42 @@ export const TapeKidsOrbitSlider: React.FC<TapeKidsOrbitSliderProps> = ({
 
     if (w <= 640) {
       earthSize = Math.min(w * 0.80, 390);
-      cardW = Math.min(w * 0.46, 205);
+      cardW = Math.min(w * 0.48, 205);
       tiltDeg = 7;
-      cardScaleMin = 0.62;
+      cardScaleMin = 0.65;
       earthOffsetY = -90;
       stageShiftY = '1.2rem';
+      const rx = w * 0.52;
+      const rz = Math.round(rx * 0.50);
+      return { rx, rz, tiltDeg, cardScaleMin, earthSize, earthOffsetY, stageShiftY, cardW };
     } else if (w <= 1024) {
-      earthSize = Math.min(w * 0.66, 530);
+      earthSize = Math.min(w * 0.66, 540);
       cardW = Math.min(w * 0.22, 220);
       tiltDeg = 8;
       cardScaleMin = 0.68;
       earthOffsetY = -75;
       stageShiftY = '0.5rem';
+      const rGlobe = earthSize / 2;
+      const minClearanceRx = (rGlobe + (cardW / 2) + 10) / 0.866;
+      const maxRx = (w / 2) - (cardW / 2) - 18;
+      const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+      const rz = Math.round(rx * 0.52);
+      return { rx, rz, tiltDeg, cardScaleMin, earthSize, earthOffsetY, stageShiftY, cardW };
     } else {
       // 72vw max on large screens
       earthSize = Math.min(w * 0.72, 840);
-      cardW = Math.min(w * 0.14, 240);
+      cardW = Math.min(w * 0.14, 230);
       tiltDeg = 9;
       cardScaleMin = 0.70;
       earthOffsetY = 0;
       stageShiftY = '-1.2rem';
+      const rGlobe = earthSize / 2;
+      const minClearanceRx = (rGlobe + (cardW / 2) + 16) / 0.866;
+      const maxRx = (w / 2) - (cardW / 2) - 32;
+      const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+      const rz = Math.round(rx * 0.54);
+      return { rx, rz, tiltDeg, cardScaleMin, earthSize, earthOffsetY, stageShiftY, cardW };
     }
-
-    const rGlobe = earthSize / 2;
-    const minClearanceRx = rGlobe + (cardW / 2) + 18;
-    const rx = Math.max(minClearanceRx, w * 0.38);
-    const rz = Math.round(rx * 0.56);
-
-    return { rx, rz, tiltDeg, cardScaleMin, earthSize, earthOffsetY, stageShiftY, cardW };
   };
 
   const stepPrev = () => {
@@ -497,23 +505,51 @@ export const TapeKidsOrbitSlider: React.FC<TapeKidsOrbitSliderProps> = ({
               const focalBoost = Math.pow(normZ, 2.8) * 0.36;
               const scale = baseScale + focalBoost;
 
-              const rotateY = -sinT * 25;
-              const rotateZ = -sinT * 3;
+              const rotateY = -sinT * 22;
+              const rotateZ = -sinT * 2.5;
 
+              // Subtle mouseover animation pull (active card pulls most noticeably, disabled during drag):
               const pullFactor = 0.35 + 0.65 * Math.pow(normZ, 2.0);
-              const pullX = smoothMouseXRef.current * 18 * pullFactor;
-              const pullY = smoothMouseYRef.current * 6 * pullFactor;
-              const pullRotY = smoothMouseXRef.current * 3.5 * pullFactor;
-              const pullRotX = -smoothMouseYRef.current * 2.0 * pullFactor;
+              const pullX = isDragging ? 0 : smoothMouseXRef.current * 16 * pullFactor;
+              const pullY = isDragging ? 0 : smoothMouseYRef.current * 5 * pullFactor;
+              const pullRotY = isDragging ? 0 : smoothMouseXRef.current * 2.5 * pullFactor;
+              const pullRotX = isDragging ? 0 : -smoothMouseYRef.current * 1.5 * pullFactor;
 
-              const isFront = z >= 0;
-              const zIndex = isFront ? 60 + Math.round(normZ * 35) : 10 + Math.round(normZ * 35);
-              const contrast = 0.65 + normZ * 0.35;
-              const brightness = 0.85 + normZ * 0.15;
-              const blurPx = Math.max(0, (0.45 - normZ) * 2.2);
-              const filter = isFront
-                ? (normZ > 0.88 ? 'none' : `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`)
-                : `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)}) blur(${blurPx.toFixed(1)}px)`;
+              // Inactive cards: fully opaque with realistic contrast & depth attenuation
+              const contrast = 0.72 + normZ * 0.28;
+              const brightness = 0.88 + normZ * 0.12;
+
+              let zIndex: number;
+              let opacity: number;
+              let pointerEvents: 'auto' | 'none';
+              let visibility: 'visible' | 'hidden';
+              let filter = 'none';
+
+              if (normZ >= 0.55) {
+                // Front hemisphere: 100% FULLY OPAQUE, crisp, interactive
+                zIndex = 70 + Math.round(normZ * 30);
+                opacity = 1;
+                pointerEvents = 'auto';
+                visibility = 'visible';
+                if (normZ <= 0.88) {
+                  filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+                }
+              } else if (normZ >= 0.45) {
+                // Horizon edge transition: smoothly fades in/out as cards round behind the globe
+                const fade = (normZ - 0.45) / 0.1;
+                zIndex = 55 + Math.round(normZ * 10);
+                opacity = fade;
+                pointerEvents = 'none';
+                visibility = 'visible';
+                filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+              } else {
+                // Far side of the globe: strictly hidden to eliminate any overlapping or ghosting
+                zIndex = 1;
+                opacity = 0;
+                pointerEvents = 'none';
+                visibility = 'hidden';
+              }
+
               const isActive = activeIndex === i;
 
               return (
@@ -538,11 +574,12 @@ export const TapeKidsOrbitSlider: React.FC<TapeKidsOrbitSliderProps> = ({
                     borderRadius: 16,
                     overflow: 'hidden',
                     cursor: 'pointer',
-                    pointerEvents: 'auto',
+                    pointerEvents,
+                    visibility,
                     transformOrigin: 'center center',
                     transform: `perspective(1200px) translate3d(${(x + pullX).toFixed(1)}px, ${(y + pullY).toFixed(1)}px, 0) rotateX(${pullRotX.toFixed(1)}deg) rotateY(${(rotateY + pullRotY).toFixed(1)}deg) rotateZ(${rotateZ.toFixed(1)}deg) scale(${scale.toFixed(3)})`,
                     zIndex,
-                    opacity: 1,
+                    opacity,
                     filter,
                     boxShadow: isActive
                       ? '0 28px 60px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 35px rgba(255, 255, 255, 0.55)'

@@ -99,8 +99,8 @@
       height: 0;
       top: 50%;
       left: 50%;
-      transform-style: preserve-3d;
       pointer-events: none;
+      z-index: 20;
     }
 
     /* Subtle decorative orbit ring guide behind/around earth */
@@ -111,8 +111,7 @@
       border-radius: 50%;
       border: 1.5px dashed rgba(255, 255, 255, 0.42);
       pointer-events: none;
-      z-index: 5;
-      transform-style: preserve-3d;
+      z-index: 10;
       opacity: 0.75;
       box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
     }
@@ -128,7 +127,7 @@
       margin-left: calc(-1 * var(--earth-size) / 2);
       border-radius: 50%;
       pointer-events: none;
-      z-index: 40;
+      z-index: 30;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -165,8 +164,7 @@
       transform-origin: center center;
       cursor: pointer;
       pointer-events: auto;
-      will-change: transform, filter;
-      opacity: 1 !important;
+      will-change: transform, filter, opacity;
       transition: box-shadow 0.25s ease;
     }
 
@@ -992,28 +990,36 @@
 
       if (w <= 640) {
         earthSize = Math.min(w * 0.80, 390);
-        cardW = Math.min(w * 0.46, 205);
+        cardW = Math.min(w * 0.48, 205);
         tiltDeg = 7;
-        cardScaleMin = 0.62;
+        cardScaleMin = 0.65;
+        const rx = w * 0.52;
+        const rz = Math.round(rx * 0.50);
+        return { rx, rz, tiltDeg, cardScaleMin, earthSize };
       } else if (w <= 1024) {
-        earthSize = Math.min(w * 0.66, 530);
+        earthSize = Math.min(w * 0.66, 540);
         cardW = Math.min(w * 0.22, 220);
         tiltDeg = 8;
         cardScaleMin = 0.68;
+        const rGlobe = earthSize / 2;
+        const minClearanceRx = (rGlobe + (cardW / 2) + 10) / 0.866;
+        const maxRx = (w / 2) - (cardW / 2) - 18;
+        const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+        const rz = Math.round(rx * 0.52);
+        return { rx, rz, tiltDeg, cardScaleMin, earthSize };
       } else {
         // 72vw max on large screens
         earthSize = Math.min(w * 0.72, 840);
-        cardW = Math.min(w * 0.14, 240);
+        cardW = Math.min(w * 0.14, 230);
         tiltDeg = 9;
         cardScaleMin = 0.70;
+        const rGlobe = earthSize / 2;
+        const minClearanceRx = (rGlobe + (cardW / 2) + 16) / 0.866;
+        const maxRx = (w / 2) - (cardW / 2) - 32;
+        const rx = Math.min(maxRx, Math.max(minClearanceRx, w * 0.40));
+        const rz = Math.round(rx * 0.54);
+        return { rx, rz, tiltDeg, cardScaleMin, earthSize };
       }
-
-      const rGlobe = earthSize / 2;
-      const minClearanceRx = rGlobe + (cardW / 2) + 18;
-      const rx = Math.max(minClearanceRx, w * 0.38);
-      const rz = Math.round(rx * 0.56);
-
-      return { rx, rz, tiltDeg, cardScaleMin, earthSize };
     }
 
     // Update 3D card layout and states
@@ -1046,38 +1052,57 @@
         const focalBoost = Math.pow(normZ, 2.8) * 0.36;
         const scale = baseScale + focalBoost;
 
-        const rotateY = -sinT * 25;
-        const rotateZ = -sinT * 3;
+        const rotateY = -sinT * 22;
+        const rotateZ = -sinT * 2.5;
 
-        // Subtle mouseover animation pull:
+        // Subtle mouseover animation pull (active card pulls most noticeably, disabled during drag):
         const pullFactor = 0.35 + 0.65 * Math.pow(normZ, 2.0);
-        const pullX = smoothMouseX * 18 * pullFactor;
-        const pullY = smoothMouseY * 6 * pullFactor;
-        const pullRotY = smoothMouseX * 3.5 * pullFactor;
-        const pullRotX = -smoothMouseY * 2.0 * pullFactor;
+        const pullX = isDragging ? 0 : smoothMouseX * 16 * pullFactor;
+        const pullY = isDragging ? 0 : smoothMouseY * 5 * pullFactor;
+        const pullRotY = isDragging ? 0 : smoothMouseX * 2.5 * pullFactor;
+        const pullRotX = isDragging ? 0 : -smoothMouseY * 1.5 * pullFactor;
 
-        // All inactive cards are FULLY OPAQUE - zero transparency at any point!
-        const contrast = 0.65 + normZ * 0.35;
-        const brightness = 0.85 + normZ * 0.15;
-        const blurPx = Math.max(0, (0.45 - normZ) * 2.2);
+        // Inactive cards: fully opaque with realistic contrast & depth attenuation
+        const contrast = 0.72 + normZ * 0.28;
+        const brightness = 0.88 + normZ * 0.12;
 
         let zIndex;
+        let opacity;
+        let pointerEvents;
+        let visibility;
         let filter = "none";
 
-        if (z >= 0) {
-          zIndex = 60 + Math.round(normZ * 35);
+        if (normZ >= 0.55) {
+          // Front hemisphere: 100% FULLY OPAQUE, crisp, interactive
+          zIndex = 70 + Math.round(normZ * 30);
+          opacity = "1";
+          pointerEvents = "auto";
+          visibility = "visible";
           if (normZ <= 0.88) {
             filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
           }
+        } else if (normZ >= 0.45) {
+          // Horizon edge transition: smoothly fades in/out as cards round behind the globe
+          const fade = (normZ - 0.45) / 0.1;
+          zIndex = 55 + Math.round(normZ * 10);
+          opacity = fade.toFixed(3);
+          pointerEvents = "none";
+          visibility = "visible";
+          filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
         } else {
-          zIndex = 10 + Math.round(normZ * 35);
-          filter = `contrast(${contrast.toFixed(2)}) brightness(${brightness.toFixed(2)}) blur(${blurPx.toFixed(1)}px)`;
+          // Far side of the globe: strictly hidden to eliminate any overlapping or ghosting
+          zIndex = 1;
+          opacity = "0";
+          pointerEvents = "none";
+          visibility = "hidden";
         }
 
         const card = cardElements[i];
         card.style.transform = `perspective(1200px) translate3d(${(x + pullX).toFixed(1)}px, ${(y + pullY).toFixed(1)}px, 0) rotateX(${pullRotX.toFixed(1)}deg) rotateY(${(rotateY + pullRotY).toFixed(1)}deg) rotateZ(${rotateZ.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
         card.style.zIndex = zIndex;
-        card.style.opacity = "1";
+        card.style.opacity = opacity;
+        card.style.pointerEvents = pointerEvents;
+        card.style.visibility = visibility;
         card.style.filter = filter;
 
         const normAngle = ((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -1236,6 +1261,7 @@
     const heroSection = document.getElementById("heroSection");
     if (heroSection) {
       heroSection.addEventListener("pointermove", (e) => {
+        if (e.pointerType !== "mouse") return;
         const rect = heroSection.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
